@@ -31,7 +31,7 @@ let allCells
 // </tr>
 // </table>`
 let createWs = function (){
-  ws = new WebSocket("ws://localhost:8081/ws")
+  ws = new WebSocket("ws://localhost:8081")
   console.log("initialized websocket")
   //while (ws.readyState !== 1);
   ws.onopen = function(evt) {
@@ -49,7 +49,7 @@ let createWs = function (){
 }
 
 function messageHandler(evt){
- //console.log(evt).toString() //data: '[{"type":"grid"},{"num":"5300700006001950000980000…3400803001700020006060000280000419005000080079"}]'
+//console.log(evt).toString() //data: '[{"type":"grid"},{"num":"5300700006001950000980000…3400803001700020006060000280000419005000080079"}]'
 // const d = JSON.parse(evt.data) 
 //   switch (d[0].type){
 //     case 'grid': 
@@ -84,6 +84,7 @@ function messageHandler(evt){
 //   default: 
 // 	break
 //   }
+//ws.send("hello")
 }
 
 function sleep(milliseconds) {
