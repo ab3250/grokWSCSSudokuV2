@@ -1,39 +1,15 @@
-;; ws-server.scm  -- Chicken 5.4
-;; Full framing, fragmentation, ping/pong, close, UTF-8 checks.
-;; No per-message deflate (recommended for speed).
-;; Hooks for your own Scheme code.
-;; called by WS 
-;; on-connect on-text on-binary on-close on-error
-;; called by program
-;; (send-text client text) (send-binary client data) (send-close client code reason) (broadcast text)
-
-(import scheme (chicken base) (chicken io) (chicken tcp)
-  (chicken bitwise) (chicken blob) (chicken string)
-  (srfi 1) (srfi 13) (srfi 18) base64 simple-sha1)
+(import scheme 
+        (chicken base) (chicken io) (chicken tcp)
+        (chicken bitwise) (chicken blob) (chicken string)
+        (srfi 1) (srfi 13) (srfi 18)
+        base64 simple-sha1)
 
 (define magic "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
 
 ;; ---------- User hooks (override these) ----------
 (define *clients* (make-parameter '()))
 
-(define (on-connect client)
-  ;; client is a port (or a record if you prefer)
-  (print "client connected")
-  #t)
 
-(define (on-text client text)
-  ;; default: echo
-  (send-text client text))
-
-(define (on-binary client data)
-  ;; data is a string of raw bytes
-  (send-binary client data))
-
-(define (on-close client code reason)
-  (print "client closed " code " " reason))
-
-(define (on-error client exn)
-  (print "error: " exn))
 
 ;; ---------- Helpers ----------
 (define (websocket-accept key)
@@ -142,6 +118,28 @@
               (let ((payload (if mask (unmask raw mask) raw)))
                 (values fin opcode rsv payload)))))))
 
+;; ---------- Send helpers (for your Scheme code) ----------
+(define (send-text out text)
+  (display (make-frame 1 text) out)
+  (flush-output out))
+
+(define (send-binary out data)
+  (display (make-frame 2 data) out)
+  (flush-output out))
+
+(define (send-close out code reason)
+  (let ((payload (string-append
+                  (string (integer->char (arithmetic-shift code -8))
+                          (integer->char (bitwise-and code #xff)))
+                  reason)))
+    (display (make-frame 8 payload) out)
+    (flush-output out)))
+
+(define (broadcast text)
+  (for-each (lambda (c)
+              (handle-exceptions exn #f
+                (send-text c text)))
+            (*clients*)))
 
 ;; ---------- Connection handler ----------
 (define (handle-websocket in out)
@@ -210,6 +208,7 @@
            (on-close out 1002 "bad opcode")))))))
 
 ;; ---------- Server ----------
+
 (define (start-server port)
   (let ((listener (tcp-listen port)))
     (print "WebSocket server on port " port)
@@ -242,14 +241,3 @@
            (close-input-port in)
            (close-output-port out)))
         (accept-loop)))))
-
-;; ---------- Your Scheme code goes here ----------
-;; Example: override the hooks
-;;
-;; (define (on-text client text)
-;;   (print "got: " text)
-;;   (broadcast (string-append "echo: " text)))
-;;
-;; (start-server 8081)
-
-(start-server 8081)
